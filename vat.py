@@ -15,14 +15,14 @@ def _l2_normalize(d):
 
 
 def vat_loss(model, X, xi=0.1, eps=1.0, Ip=1, use_gpu=True):
-    """
+    """VAT loss function
     :param model: networks to train
     :param X: Variable, input
     :param xi: hyperparameter of VAT (default: 1.0)
     :param eps: hyperparameter of VAT (default: 1.0)
     :param Ip: iteration times of computing adv noise (default: 1)
-    :param use_gpu: use gpu or not
-    :return: LDS, classification loss, model prediction
+    :param use_gpu: use gpu or not (default: True)
+    :return: LDS, model prediction (for classification-loss calculation)
     """
     kl_div = nn.KLDivLoss()
     if use_gpu:
@@ -30,12 +30,13 @@ def vat_loss(model, X, xi=0.1, eps=1.0, Ip=1, use_gpu=True):
 
     pred = model(X)
 
-    # calc adversarial direction
+    # prepare random unit tensor
     d = torch.rand(X.shape)
     d = Variable(_l2_normalize(d))
     if use_gpu:
         d = d.cuda()
-    
+        
+    # calc adversarial direction
     for ip in range(Ip):
         d.requires_grad = True
         pred_hat = model(X + d / xi)
@@ -44,6 +45,7 @@ def vat_loss(model, X, xi=0.1, eps=1.0, Ip=1, use_gpu=True):
         d = Variable(_l2_normalize(d.grad.data))
         model.zero_grad()
 
+    # calc LDS
     r_adv = d * eps
     pred_hat = model(X + r_adv)
     pred = model(X)
