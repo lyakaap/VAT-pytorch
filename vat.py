@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 def _l2_normalize(d):
     d_reshaped = d.view(d.shape[0], -1, 1, 1)
-    d /= torch.norm(d_reshaped, dim=1, keepdim=True) + 1e-16
+    d /= torch.norm(d_reshaped, dim=1, keepdim=True) + 1e-8
     return d
 
 
