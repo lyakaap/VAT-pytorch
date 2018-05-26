@@ -1,53 +1,53 @@
 import torch
-from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 
 
 def _l2_normalize(d):
-    if isinstance(d, Variable):
-        d = d.data.numpy()
-    elif isinstance(d, torch.Tensor):
-        d = d.numpy()
-    d /= (np.sqrt(np.sum(d ** 2, axis=(1, 2, 3))).reshape((-1, 1, 1, 1)) + 1e-16)
-    return torch.from_numpy(d)
+    d_reshaped = d.view(d.shape[0], -1, 1, 1)
+    d /= torch.norm(d_reshaped, dim=1, keepdim=True) + 1e-16
+    return d
 
 
-def vat_loss(model, X, xi=0.1, eps=1.0, Ip=1, use_gpu=True):
-    """VAT loss function
-    :param model: networks to train
-    :param X: Variable, input
-    :param xi: hyperparameter of VAT (default: 1.0)
-    :param eps: hyperparameter of VAT (default: 1.0)
-    :param Ip: iteration times of computing adv noise (default: 1)
-    :param use_gpu: use gpu or not (default: True)
-    :return: LDS, model prediction (for classification-loss calculation)
-    """
-    kl_div = nn.KLDivLoss()
-    if use_gpu:
-        kl_div.cuda()
+class VATLoss(nn.Module):
 
-    pred = model(X)
+    def __init__(self, model, xi=0.1, eps=1.0, ip=1):
+        """VAT loss
+        :param model: networks to train
+        :param xi: hyperparameter of VAT (default: 1.0)
+        :param eps: hyperparameter of VAT (default: 1.0)
+        :param ip: iteration times of computing adv noise (default: 1)
+        """
+        super(VATLoss, self).__init__()
+        self.model = model
+        self.xi = xi
+        self.eps = eps
+        self.ip = ip
 
-    # prepare random unit tensor
-    d = torch.rand(X.shape)
-    d = Variable(_l2_normalize(d))
-    if use_gpu:
-        d = d.cuda()
-        
-    # calc adversarial direction
-    for ip in range(Ip):
-        d.requires_grad = True
-        pred_hat = model(X + d / xi)
-        adv_distance = kl_div(F.log_softmax(pred_hat, dim=1), pred.detach())
-        adv_distance.backward()
-        d = Variable(_l2_normalize(d.grad.data))
-        model.zero_grad()
+    def forward(self, x):
 
-    # calc LDS
-    r_adv = d * eps
-    pred_hat = model(X + r_adv)
-    pred = model(X)
-    LDS = kl_div(F.log_softmax(pred_hat, dim=1), pred.detach())
-    return LDS, pred
+        kl_div = nn.KLDivLoss()
+
+        with torch.no_grad():
+            pred = self.model(x)
+
+        # prepare random unit tensor
+        d = torch.rand(x.shape).to(
+            torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
+        d = _l2_normalize(d)
+
+        # calc adversarial direction
+        for _ in range(self.ip):
+            d.requires_grad = True
+            pred_hat = self.model(x + d / self.xi)
+            adv_distance = kl_div(F.log_softmax(pred_hat, dim=1), pred)
+            adv_distance.backward()
+            d = _l2_normalize(d.grad)
+            self.model.zero_grad()
+
+        # calc LDS
+        r_adv = d * self.eps
+        pred_hat = self.model(x + r_adv)
+        lds = kl_div(F.log_softmax(pred_hat, dim=1), pred)
+
+        return lds
