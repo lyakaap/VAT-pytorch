@@ -29,7 +29,7 @@ class VATLoss(nn.Module):
         kl_div = nn.KLDivLoss()
 
         with torch.no_grad():
-            pred = self.model(x)
+            pred = F.softmax(self.model(x), dim=1)
 
         # prepare random unit tensor
         d = torch.rand(x.shape).to(
