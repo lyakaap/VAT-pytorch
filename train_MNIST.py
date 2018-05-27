@@ -93,7 +93,7 @@ def main():
                         help='SGD momentum (default: 0.5)')
     parser.add_argument('--alpha', type=float, default=1.0, metavar='ALPHA',
                         help='regularization coefficient (default: 1.0)')
-    parser.add_argument('--xi', type=float, default=0.1, metavar='XI',
+    parser.add_argument('--xi', type=float, default=10.0, metavar='XI',
                         help='hyperparameter of VAT (default: 0.1)')
     parser.add_argument('--eps', type=float, default=1.0, metavar='EPS',
                         help='hyperparameter of VAT (default: 1.0)')
