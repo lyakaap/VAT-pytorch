@@ -32,10 +32,10 @@ def train(args, model, device, train_loader, optimizer, epoch):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
 
-        vat_loss = VATLoss(model, xi=0.1, eps=1.0, ip=1)
+        vat_loss = VATLoss(xi=0.1, eps=1.0, ip=1)
         cross_entropy = nn.CrossEntropyLoss()
 
-        lds = vat_loss(data)
+        lds = vat_loss(model, data)
         output = model(data)
         classification_loss = cross_entropy(output, target)
         loss = classification_loss + args.alpha * lds
@@ -58,10 +58,10 @@ def test(args, model, device, test_loader):
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             
-            vat_loss = VATLoss(model, xi=0.1, eps=1.0, ip=1)
+            vat_loss = VATLoss(xi=0.1, eps=1.0, ip=1)
             cross_entropy = nn.CrossEntropyLoss()
 
-            lds = vat_loss(data)
+            lds = vat_loss(model, data)
             output = model(data)
             classification_loss = cross_entropy(output, target, size_average=False)
             test_classification_loss += classification_loss.item()

@@ -31,43 +31,39 @@ def _kl_div(log_probs, probs):
 
 class VATLoss(nn.Module):
 
-    def __init__(self, model, xi=10.0, eps=1.0, ip=1):
+    def __init__(self, xi=10.0, eps=1.0, ip=1):
         """VAT loss
-        :param model: networks to train
         :param xi: hyperparameter of VAT (default: 10.0)
         :param eps: hyperparameter of VAT (default: 1.0)
         :param ip: iteration times of computing adv noise (default: 1)
         """
         super(VATLoss, self).__init__()
-        self.model = model
         self.xi = xi
         self.eps = eps
         self.ip = ip
-        self.ent_min = ent_min
 
-    def forward(self, x, d, a):
+    def forward(self, model, x):
         with torch.no_grad():
-            pred = F.softmax(self.model(x), dim=1)
+            pred = F.softmax(model(x), dim=1)
 
         # prepare random unit tensor
         d = torch.rand(x.shape).to(
-            torch.device("cuda:0" if torch.cuda.is_available() else "cpu"))
+            torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         d = _l2_normalize(d)
 
-        # calc adversarial direction
-        for _ in range(self.ip):
-            d.requires_grad_()
-            with _disable_tracking_bn_stats(self.model):
-                pred_hat = self.model(x + self.xi * d)
-            adv_distance = _kl_div(F.log_softmax(pred_hat, dim=1), pred)
-            adv_distance.backward()
-            d = _l2_normalize(d.grad)
-            self.model.zero_grad()
-
-        # calc LDS
-        r_adv = d * self.eps
-        with _disable_tracking_bn_stats(self.model):
-            pred_hat = self.model(x + r_adv)
-        lds = _kl_div(F.log_softmax(pred_hat, dim=1), pred)
+        with _disable_tracking_bn_stats(model):
+            # calc adversarial direction
+            for _ in range(self.ip):
+                d.requires_grad_()
+                pred_hat = model(x + self.xi * d)
+                adv_distance = _kl_div(F.log_softmax(pred_hat, dim=1), pred)
+                adv_distance.backward()
+                d = _l2_normalize(d.grad)
+                model.zero_grad()
+    
+            # calc LDS
+            r_adv = d * self.eps
+            pred_hat = model(x + r_adv)
+            lds = _kl_div(F.log_softmax(pred_hat, dim=1), pred)
 
         return lds
