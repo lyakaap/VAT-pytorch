@@ -41,26 +41,20 @@ class InfiniteSampler(sampler.Sampler):
 
 
 def get_iters(
-        dataset='CIFAR10', data_transforms=None,
+        dataset='CIFAR10', root_path='.', data_transforms=None,
         n_labeled=4000, valid_size=1000,
         l_batch_size=32, ul_batch_size=128, test_batch_size=256,
-        workers=8, pseudo_label=None, seed=0):
+        workers=8, pseudo_label=None):
+    
+    train_path = f'{root_path}/data/{dataset}/train/'
+    test_path = f'{root_path}/data/{dataset}/test/'
 
-    if dataset == 'MNIST':
-        train_dataset = datasets.MNIST(f'/opt/deep-subspace/data/{dataset}/train/',
-                                       download=True, train=True, transform=None)
-        test_dataset = datasets.MNIST(f'/opt/deep-subspace/data/{dataset}/test/',
-                                      download=True, train=False, transform=None)
-    elif dataset == 'CIFAR10':
-        train_dataset = datasets.CIFAR10(f'/opt/deep-subspace/data/{dataset}/train/',
-                                         download=True, train=True, transform=None)
-        test_dataset = datasets.CIFAR10(f'/opt/deep-subspace/data/{dataset}/test/',
-                                        download=True, train=False, transform=None)
+    if dataset == 'CIFAR10':
+        train_dataset = datasets.CIFAR10(train_path, download=True, train=True, transform=None)
+        test_dataset = datasets.CIFAR10(test_path, download=True, train=False, transform=None)
     elif dataset == 'CIFAR100':
-        train_dataset = datasets.CIFAR100(f'/opt/deep-subspace/data/{dataset}/train/',
-                                          download=True, train=True, transform=None)
-        test_dataset = datasets.CIFAR100(f'/opt/deep-subspace/data/{dataset}/test/',
-                                         download=True, train=False, transform=None)
+        train_dataset = datasets.CIFAR100(train_path, download=True, train=True, transform=None)
+        test_dataset = datasets.CIFAR100(test_path, download=True, train=False, transform=None)
     else:
         raise ValueError
 
@@ -79,15 +73,9 @@ def get_iters(
             ]),
         }
 
-    x_train, y_train = train_dataset.train_data, train_dataset.train_labels
-    x_test, y_test = test_dataset.test_data, test_dataset.test_labels
+    x_train, y_train = train_dataset.train_data, np.array(train_dataset.train_labels)
+    x_test, y_test = test_dataset.test_data, np.array(test_dataset.test_labels)
 
-    # one-hot encoding
-    lb = LabelBinarizer()
-    y_train = lb.fit_transform(y_train).astype(np.float32)
-    y_test = lb.fit_transform(y_test).astype(np.float32)
-
-    np.random.seed(seed)
     randperm = np.random.permutation(len(x_train))
     labeled_idx = randperm[:n_labeled]
     validation_idx = randperm[n_labeled:n_labeled + valid_size]
@@ -108,12 +96,12 @@ def get_iters(
     data_iterators = {
         'labeled': iter(DataLoader(
             SimpleDataset(x_labeled, y_labeled, data_transforms['train']),
-            batch_size=l_batch_size, num_workers=workers, pin_memory=True,
+            batch_size=l_batch_size, num_workers=workers,
             sampler=InfiniteSampler(len(x_labeled)),
         )),
         'unlabeled': iter(DataLoader(
             SimpleDataset(x_unlabeled, y_unlabeled, data_transforms['train']),
-            batch_size=ul_batch_size, num_workers=workers, pin_memory=True,
+            batch_size=ul_batch_size, num_workers=workers,
             sampler=InfiniteSampler(len(x_unlabeled)),
         )),
         'make_pl': iter(DataLoader(
