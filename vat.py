@@ -46,7 +46,7 @@ class VATLoss(nn.Module):
             pred = F.softmax(model(x), dim=1)
 
         # prepare random unit tensor
-        d = torch.rand(x.shape).to(
+        d = torch.rand(x.shape).sub(0.5).to(
             torch.device('cuda' if torch.cuda.is_available() else 'cpu'))
         d = _l2_normalize(d)
 
