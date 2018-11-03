@@ -11,11 +11,11 @@ for batch_idx, (data, target) in enumerate(train_loader):
     data, target = data.to(device), target.to(device)
     optimizer.zero_grad()
 
-    vat_loss = VATLoss(model, xi=10.0, eps=1.0, ip=1)
+    vat_loss = VATLoss(xi=10.0, eps=1.0, ip=1)
     cross_entropy = nn.CrossEntropyLoss()
 
     # LDS should be calculated before the forward for cross entropy
-    lds = vat_loss(data)
+    lds = vat_loss(model, data)
     output = model(data)
     loss = cross_entropy(output, target) + args.alpha * lds
     loss.backward()
