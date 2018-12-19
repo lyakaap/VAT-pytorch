@@ -22,12 +22,6 @@ def _l2_normalize(d):
     return d
 
 
-def _kl_div(log_probs, probs):
-    # pytorch KLDLoss is averaged over all dim if size_average=True
-    kld = F.kl_div(log_probs, probs, size_average=False)
-    return kld / log_probs.shape[0]
-
-
 class VATLoss(nn.Module):
 
     def __init__(self, xi=10.0, eps=1.0, ip=1):
@@ -54,7 +48,8 @@ class VATLoss(nn.Module):
             for _ in range(self.ip):
                 d.requires_grad_()
                 pred_hat = model(x + self.xi * d)
-                adv_distance = _kl_div(F.log_softmax(pred_hat, dim=1), pred)
+                logp_hat = F.log_softmax(pred_hat, dim=1)
+                adv_distance = F.kl_div(logp_hat, pred, reduction='batchmean')
                 adv_distance.backward()
                 d = _l2_normalize(d.grad)
                 model.zero_grad()
@@ -62,6 +57,7 @@ class VATLoss(nn.Module):
             # calc LDS
             r_adv = d * self.eps
             pred_hat = model(x + r_adv)
-            lds = _kl_div(F.log_softmax(pred_hat, dim=1), pred)
+            logp_hat = F.log_softmax(pred_hat, dim=1)
+            lds = F.kl_div(logp_hat, pred, reduction='batchmean')
 
         return lds
